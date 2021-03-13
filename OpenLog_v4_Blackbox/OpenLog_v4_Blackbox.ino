@@ -51,6 +51,9 @@
  This version has been modified for use with the Blackbox feature for Baseflight / Cleanflight. This version 
  removes useless settings from CONFIG.TXT and changes the default baud rate to 115200.
  
+ v4 Blackbox edition
+ This version has been modified to include the newest better performing versions of SdFat and SerialPort available in 2021.
+ Performance on the SPI write speed to micro SD-Cards mainly from DEDICATED_SPI functionality available in the latest SdFat Version 2.
  */
 
 #include <SdFat.h> //We do not use the built-in SD.h file because it calls Serial.print
@@ -106,8 +109,20 @@ const byte statled2 = 13; //This is the SPI LED, indicating SD traffic
 #define OFF   0x00
 #define ON    0x01
 
-Sd2Card card;
-SdVolume volume;
+#ifndef SDCARD_SS_PIN
+const uint8_t SD_CS_PIN = SS;
+#else  // SDCARD_SS_PIN
+// Assume built-in SD is used.
+const uint8_t SD_CS_PIN = SDCARD_SS_PIN;
+#endif  // SDCARD_SS_PIN
+
+// Try max SPI clock for an SD. Reduce SPI_CLOCK if errors occur.
+#define SPI_CLOCK SD_SCK_MHZ(50)
+
+#define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
+
+SdSpiCard card;
+SdFat32 volume;
 SdFile currentDirectory;
 
 long setting_uart_speed; //This is the baud rate that the system runs at. Can be 300 to 1,000,000
@@ -186,7 +201,7 @@ void setup(void) {
     NewSerial.print(F("1"));
 
     //Setup SD & FAT
-    if (!card.init(SPI_FULL_SPEED))
+    if (!card.begin(SD_CONFIG))
         systemError(ERROR_CARD_INIT);
     if (!volume.init(&card))
         systemError(ERROR_VOLUME_INIT);
